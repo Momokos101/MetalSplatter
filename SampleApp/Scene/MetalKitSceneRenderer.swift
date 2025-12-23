@@ -24,7 +24,13 @@ class MetalKitSceneRenderer: NSObject, MTKViewDelegate {
 
     var lastRotationUpdateTimestamp: Date? = nil
     var rotation: Angle = .zero
-
+    
+    // 手势控制状态
+    var panOffset: SIMD2<Float> = SIMD2<Float>(0, 0)  // 平移偏移
+    var scale: Float = 1.0  // 缩放比例
+    var gestureRotation: Angle = .zero  // 手势旋转角度
+    var isGestureActive: Bool = false  // 是否有手势交互，用于禁用自动旋转
+    
     var drawableSize: CGSize = .zero
 
     init?(_ metalKitView: MTKView) {
@@ -71,9 +77,15 @@ class MetalKitSceneRenderer: NSObject, MTKViewDelegate {
                                                              nearZ: 0.1,
                                                              farZ: 100.0)
 
-        let rotationMatrix = matrix4x4_rotation(radians: Float(rotation.radians),
+        // 组合自动旋转和手势旋转
+        let totalRotation = rotation + gestureRotation
+        let rotationMatrix = matrix4x4_rotation(radians: Float(totalRotation.radians),
                                                 axis: Constants.rotationAxis)
-        let translationMatrix = matrix4x4_translation(0.0, 0.0, Constants.modelCenterZ)
+        
+        // 应用缩放和平移
+        let scaledZ = Constants.modelCenterZ * scale
+        let translationMatrix = matrix4x4_translation(panOffset.x, panOffset.y, scaledZ)
+        
         // Turn common 3D GS PLY files rightside-up. This isn't generally meaningful, it just
         // happens to be a useful default for the most common datasets at the moment.
         let commonUpCalibration = matrix4x4_rotation(radians: .pi, axis: SIMD3<Float>(0, 0, 1))
@@ -87,13 +99,31 @@ class MetalKitSceneRenderer: NSObject, MTKViewDelegate {
     }
 
     private func updateRotation() {
-        let now = Date()
-        defer {
-            lastRotationUpdateTimestamp = now
+        // 自动旋转已禁用，仅通过手势控制旋转
+        return
+    }
+    
+    // 手势更新方法
+    func updatePan(offset: SIMD2<Float>) {
+        panOffset = offset
+        isGestureActive = true
+    }
+    
+    func updateScale(_ newScale: Float) {
+        scale = newScale
+        isGestureActive = true
+    }
+    
+    func updateRotation(_ angle: Angle) {
+        gestureRotation = angle
+        isGestureActive = true
+    }
+    
+    func resetGestureState() {
+        // 延迟重置，避免手势结束时立即恢复自动旋转
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.isGestureActive = false
         }
-
-        guard let lastRotationUpdateTimestamp else { return }
-        rotation += Constants.rotationPerSecond * now.timeIntervalSince(lastRotationUpdateTimestamp)
     }
 
     func draw(in view: MTKView) {
