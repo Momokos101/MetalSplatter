@@ -1,17 +1,18 @@
 //
-//  _DGSApp.swift
-//  3DGS
+//  App.swift
+//  3DGS Scanner
 //
-//  Created by Siri- iii on 2025/12/24.
+//  应用入口文件 - 主应用结构
 //
 
 import SwiftUI
 
 @main
-struct _DGSApp: App {
+struct GaussianSplattingApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
         }
     }
 }
+
