@@ -37,7 +37,6 @@ struct ModelCard: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .shadow(color: .blue.opacity(0.15), radius: 6)
-        .disabled(model.status != .completed)
     }
 }
 
@@ -119,7 +118,7 @@ struct ModelCardContent: View {
             switch model.status {
             case .completed:
                 CompletedCardContent(scanPosition: $scanPosition)
-            case .processing:
+            case .processing, .uploading, .queued:
                 ProcessingCardContent(scanPosition: $scanPosition)
             case .failed:
                 FailedCardContent()
@@ -312,7 +311,7 @@ struct StatusBadge: View {
     
     private var statusText: String {
         switch status {
-        case .processing: return "处理中"
+        case .processing, .uploading, .queued: return "处理中"
         case .completed: return "已完成"
         case .failed: return "失败"
         }
@@ -320,7 +319,7 @@ struct StatusBadge: View {
     
     private var backgroundColor: Color {
         switch status {
-        case .processing: return Color.cyan.opacity(0.8)
+        case .processing, .uploading, .queued: return Color.cyan.opacity(0.8)
         case .completed: return Color.green.opacity(0.8)
         case .failed: return Color.red.opacity(0.8)
         }
@@ -328,7 +327,7 @@ struct StatusBadge: View {
     
     private var shadowColor: Color {
         switch status {
-        case .processing: return .cyan.opacity(0.5)
+        case .processing, .uploading, .queued: return .cyan.opacity(0.5)
         case .completed: return .green.opacity(0.5)
         case .failed: return .red.opacity(0.5)
         }
@@ -351,23 +350,31 @@ extension Date {
             ModelCard(
                 model: Model3D(
                     id: "1",
+                    taskId: "task1",
                     name: "客厅场景",
                     thumbnail: "",
                     type: "视频",
                     timestamp: Date(),
-                    status: .completed
+                    status: .completed,
+                    plyPath: nil,
+                    stage: nil,
+                    errorMessage: nil
                 ),
                 action: {}
             )
-            
+
             ModelCard(
                 model: Model3D(
                     id: "2",
+                    taskId: "task2",
                     name: "处理中模型",
                     thumbnail: "",
                     type: "连拍",
                     timestamp: Date(),
-                    status: .processing
+                    status: .processing,
+                    plyPath: nil,
+                    stage: "正在训练...",
+                    errorMessage: nil
                 ),
                 action: {}
             )

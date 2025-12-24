@@ -9,25 +9,23 @@ import SwiftUI
 
 struct UploadTab: View {
     @ObservedObject var viewModel: AppViewModel
-    
+
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
-                // 标题区域 - 移动端样式
+                // 标题区域
                 VStack(alignment: .leading, spacing: 4) {
-                    AnimatedTitle(
-                        text: "创建3D模型",
-                        colors: [.white, .cyan, .pink, .cyan, .white]
-                    )
-                    
+                    Text("创建3D模型")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+
                     Text("选择拍摄方式开始创建")
-                        .font(.system(size: 13))
-                        .foregroundColor(Color(white: 0.65))
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.5))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 12)
-                .padding(.leading, 16)
-                .padding(.trailing, 16)
+                .padding(.horizontal, 16)
                 .padding(.bottom, 20)
                 
                 // 按钮列表 - 占满剩余空间
@@ -70,6 +68,7 @@ struct UploadTab: View {
                     ProgressCard(
                         fileName: progress.fileName,
                         progress: progress.progress,
+                        stage: progress.stage,
                         onCancel: { viewModel.cancelUpload() }
                     )
                     .padding(.leading, 16)
@@ -82,227 +81,90 @@ struct UploadTab: View {
         .fullScreenCover(isPresented: $viewModel.showVideoRecording) {
             VideoRecordingView(
                 isPresented: $viewModel.showVideoRecording,
-                onComplete: { fileName in
-                    viewModel.handleUpload(fileName: fileName)
+                onComplete: { videoURL in
+                    viewModel.uploadVideo(url: videoURL)
                 }
             )
         }
         .fullScreenCover(isPresented: $viewModel.showPhotoCapture) {
             PhotoCaptureView(
                 isPresented: $viewModel.showPhotoCapture,
-                onComplete: { fileName in
-                    viewModel.handleUpload(fileName: fileName)
+                onComplete: { imageURLs in
+                    viewModel.uploadImages(urls: imageURLs)
                 }
             )
         }
         .sheet(isPresented: $viewModel.showGallery) {
-            Text("相册选择器")
-                .font(.title)
+            GalleryPickerView(
+                isPresented: $viewModel.showGallery,
+                onVideoSelected: { videoURL in
+                    viewModel.uploadVideo(url: videoURL)
+                },
+                onImagesSelected: { imageURLs in
+                    viewModel.uploadImages(urls: imageURLs)
+                }
+            )
         }
     }
 }
 
-// MARK: - 移动端操作按钮 - 全宽设计
+// MARK: - 简约操作按钮
 struct MobileActionButton: View {
     let icon: String
     let title: String
     let subtitle: String
     let style: ButtonStyle
     let action: () -> Void
-    
+
     enum ButtonStyle {
         case primary, secondary, tertiary
     }
-    
-    @State private var isPressed = false
-    @State private var glowScale: CGFloat = 1.0
-    @State private var shimmerOffset: CGFloat = -300
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 14) {
-                // 图标 - 更大更突出
+                // 图标
                 ZStack {
-                    Group {
-                        switch style {
-                        case .primary:
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(
-                                        LinearGradient(
-                                            gradient: Gradient(colors: [Color.cyan, Color.blue]),
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                                
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.green.opacity(0.6), lineWidth: 2)
-                                    .scaleEffect(glowScale)
-                                    .opacity(2 - glowScale)
-                            }
-                        case .secondary:
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(
-                                        LinearGradient(
-                                            gradient: Gradient(colors: [Color.purple, Color.pink]),
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                                
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.pink.opacity(0.5), lineWidth: 2)
-                                    .scaleEffect(glowScale)
-                                    .opacity(2 - glowScale)
-                            }
-                        case .tertiary:
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color(white: 0.15))
-                                
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.cyan.opacity(0.4), lineWidth: 2)
-                                    .scaleEffect(glowScale)
-                                    .opacity(2 - glowScale)
-                            }
-                        }
-                    }
-                    .frame(width: 56, height: 56)
-                    
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(iconBackground)
+                        .frame(width: 48, height: 48)
+
                     Image(systemName: icon)
-                        .font(.system(size: 24, weight: .semibold))
+                        .font(.system(size: 20, weight: .medium))
                         .foregroundColor(.white)
                 }
-                
-                // 文字 - 左对齐，全宽，更大
-                VStack(alignment: .leading, spacing: 4) {
+
+                // 文字
+                VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
-                        .lineLimit(1)
-                    
+
                     Text(subtitle)
-                        .font(.system(size: 13))
-                        .foregroundColor(Color(white: 0.7))
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.5))
+                        .lineLimit(1)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
-                // 箭头 - 更大
+
+                Spacer()
+
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(Color(white: 0.4))
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.3))
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .padding(.leading, 18)
-            .padding(.trailing, 18)
-            .padding(.top, 18)
-            .padding(.bottom, 18)
-            .background(
-                ZStack {
-                    buttonBackground
-                    
-                    // 所有按钮都有扫光效果
-                    Rectangle()
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color.clear,
-                                    shimmerColor.opacity(0.2),
-                                    Color.clear
-                                ]),
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .offset(x: shimmerOffset)
-                        .blur(radius: 8)
-                }
-            )
-            .cornerRadius(10)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(borderColor, lineWidth: borderWidth)
-            )
+            .padding(16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(white: 0.1))
+            .cornerRadius(12)
         }
-        .buttonStyle(PlainButtonStyle())
-        .scaleEffect(isPressed ? 0.97 : 1.0)
-        .animation(.spring(response: 0.2), value: isPressed)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
-        .onAppear {
-            // 所有按钮都有脉冲动画
-            withAnimation(
-                Animation.easeOut(duration: 1.5)
-                    .repeatForever(autoreverses: false)
-            ) {
-                glowScale = 1.6
-            }
-            
-            // 所有按钮都有扫光动画
-            withAnimation(
-                Animation.linear(duration: 2.5)
-                    .repeatForever(autoreverses: false)
-            ) {
-                shimmerOffset = 400
-            }
-        }
+        .buttonStyle(ScaleButtonStyle())
     }
-    
-    private var buttonBackground: some View {
-        Group {
-            switch style {
-            case .primary:
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color.cyan.opacity(0.12),
-                        Color.blue.opacity(0.08)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            case .secondary:
-                Color(white: 0.08).opacity(0.5)
-            case .tertiary:
-                Color(white: 0.06).opacity(0.4)
-            }
-        }
-    }
-    
-    private var borderColor: Color {
+
+    private var iconBackground: Color {
         switch style {
-        case .primary:
-            return Color.cyan.opacity(0.25)
-        case .secondary:
-            return Color.purple.opacity(0.25)
-        case .tertiary:
-            return Color(white: 0.15)
-        }
-    }
-    
-    private var borderWidth: CGFloat {
-        switch style {
-        case .primary:
-            return 1.5
-        case .secondary, .tertiary:
-            return 1
-        }
-    }
-    
-    private var shimmerColor: Color {
-        switch style {
-        case .primary:
-            return Color.white
-        case .secondary:
-            return Color.pink
-        case .tertiary:
-            return Color.cyan
+        case .primary: return .cyan
+        case .secondary: return .purple
+        case .tertiary: return Color(white: 0.2)
         }
     }
 }
@@ -311,8 +173,8 @@ struct MobileActionButton: View {
 struct ScaleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .animation(.spring(response: 0.2), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 

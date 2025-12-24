@@ -9,54 +9,58 @@ import SwiftUI
 
 struct ModelsTab: View {
     @ObservedObject var viewModel: AppViewModel
-    
+    @State private var selectedProgressModel: Model3D?
+
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                // 标题区域 - 移动端样式
-                VStack(alignment: .leading, spacing: 4) {
-                    AnimatedTitle(
-                        text: "我的模型",
-                        colors: [.white, .blue, .cyan, .blue, .white]
-                    )
-                    
-                    AnimatedUnderline()
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 8)
-                .padding(.leading, 16)
-                .padding(.trailing, 16)
-                .padding(.bottom, 12)
-                
-                // 模型网格 - 移动端2列布局
-                if viewModel.models.isEmpty {
-                    EmptyStateView()
-                        .padding(.top, 60)
-                        .padding(.bottom, 16)
-                } else {
-                    LazyVGrid(
-                        columns: [
-                            GridItem(.flexible(), spacing: 8),
-                            GridItem(.flexible(), spacing: 8)
-                        ],
-                        spacing: 8
-                    ) {
-                        ForEach(Array(viewModel.models.enumerated()), id: \.element.id) { index, model in
-                            ModelCard(model: model) {
-                                viewModel.selectModel(model)
-                            }
-                            .transition(.scale.combined(with: .opacity))
-                            .animation(
-                                .spring(response: 0.4)
-                                    .delay(Double(index) * 0.03),
-                                value: viewModel.models.count
-                            )
-                        }
+        ZStack {
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    // 标题区域
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("我的模型")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
                     }
-                    .padding(.leading, 16)
-                    .padding(.trailing, 16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 12)
+                    .padding(.horizontal, 16)
                     .padding(.bottom, 16)
+
+                    // 模型网格
+                    if viewModel.models.isEmpty {
+                        EmptyStateView()
+                            .padding(.top, 60)
+                    } else {
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.flexible(), spacing: 8),
+                                GridItem(.flexible(), spacing: 8)
+                            ],
+                            spacing: 8
+                        ) {
+                            ForEach(viewModel.models) { model in
+                                ModelCard(model: model) {
+                                    handleModelTap(model)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 16)
+                    }
                 }
+            }
+
+            // 进度详情弹窗
+            if let model = selectedProgressModel {
+                TaskProgressView(
+                    model: model,
+                    isPresented: Binding(
+                        get: { selectedProgressModel != nil },
+                        set: { if !$0 { selectedProgressModel = nil } }
+                    ),
+                    viewModel: viewModel
+                )
+                .transition(.opacity)
             }
         }
         .fullScreenCover(item: $viewModel.selectedModel) { model in
@@ -64,6 +68,16 @@ struct ModelsTab: View {
                 get: { viewModel.selectedModel != nil },
                 set: { if !$0 { viewModel.selectedModel = nil } }
             ))
+        }
+    }
+
+    private func handleModelTap(_ model: Model3D) {
+        if model.status == .completed {
+            viewModel.selectModel(model)
+        } else {
+            withAnimation(.easeOut(duration: 0.2)) {
+                selectedProgressModel = model
+            }
         }
     }
 }

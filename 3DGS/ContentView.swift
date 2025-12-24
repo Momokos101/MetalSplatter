@@ -13,20 +13,20 @@ extension Color {
 struct ContentView: View {
     @StateObject private var viewModel = AppViewModel()
     @State private var selectedTab = 0
-    
+
     var body: some View {
-        ZStack {
-            // 背景层
-            Color.black
-                .ignoresSafeArea()
-            
-            // 轻量级科技感背景
-            LightTechBackground()
-            
-            // 主内容区
-            VStack(spacing: 0) {
-                // Tab内容
-                Group {
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                // 背景层
+                Color.black
+                    .ignoresSafeArea()
+
+                // 轻量级科技感背景
+                LightTechBackground()
+                    .ignoresSafeArea()
+
+                // Tab 内容区
+                VStack(spacing: 0) {
                     if selectedTab == 0 {
                         UploadTab(viewModel: viewModel)
                     } else {
@@ -34,9 +34,11 @@ struct ContentView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                
-                // 底部Tab栏
-                MobileTabBar(selectedTab: $selectedTab)
+                .padding(.bottom, 70 + geometry.safeAreaInsets.bottom)
+
+                // 底部 Tab 栏 - 固定在底部
+                GlassTabBar(selectedTab: $selectedTab)
+                    .ignoresSafeArea(.all, edges: .bottom)
             }
         }
         .preferredColorScheme(.dark)
@@ -138,172 +140,113 @@ struct FloatingParticle: View {
     }
 }
 
-// MARK: - 移动端Tab栏
-struct MobileTabBar: View {
+// MARK: - 毛玻璃 Tab 栏
+struct GlassTabBar: View {
     @Binding var selectedTab: Int
-    @State private var glowOffset: CGFloat = -200
-    
+    @Namespace private var animation
+
     var body: some View {
-        VStack(spacing: 0) {
-            // 顶部分隔线
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            Color.clear,
-                            Color.cyan.opacity(0.25),
-                            Color.clear
-                        ]),
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .frame(height: 0.5)
-                .overlay(
-                    Rectangle()
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color.clear,
-                                    Color.cyan,
-                                    Color.pink,
-                                    Color.cyan,
-                                    Color.clear
-                                ]),
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                // 发光顶部边框
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.cyan.opacity(0.6), .purple.opacity(0.4), .cyan.opacity(0.6)],
+                            startPoint: .leading,
+                            endPoint: .trailing
                         )
-                        .frame(width: 80, height: 0.5)
-                        .offset(x: glowOffset)
-                        .blur(radius: 1)
-                )
-                .onAppear {
-                    withAnimation(
-                        Animation.linear(duration: 2.5)
-                            .repeatForever(autoreverses: false)
+                    )
+                    .frame(height: 1)
+                    .shadow(color: .cyan.opacity(0.5), radius: 4, y: -2)
+
+                // Tab 按钮
+                HStack(spacing: 0) {
+                    GlassTabItem(
+                        icon: "video.fill",
+                        title: "创建",
+                        isSelected: selectedTab == 0,
+                        namespace: animation
                     ) {
-                        if let screen = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                           let window = screen.windows.first {
-                            glowOffset = window.bounds.width + 100
-                        } else {
-                            glowOffset = 500
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            selectedTab = 0
+                        }
+                    }
+
+                    GlassTabItem(
+                        icon: "cube.transparent",
+                        title: "模型",
+                        isSelected: selectedTab == 1,
+                        namespace: animation
+                    ) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            selectedTab = 1
                         }
                     }
                 }
-            
-            // Tab按钮
-            HStack(spacing: 0) {
-                TabButton(
-                    icon: "video.fill",
-                    title: "创建",
-                    isSelected: selectedTab == 0,
-                    action: { withAnimation(.spring(response: 0.25)) { selectedTab = 0 } }
-                )
-                
-                TabButton(
-                    icon: "square.grid.3x3.fill",
-                    title: "模型",
-                    isSelected: selectedTab == 1,
-                    action: { withAnimation(.spring(response: 0.25)) { selectedTab = 1 } }
-                )
+                .padding(.top, 8)
+                .padding(.bottom, geometry.safeAreaInsets.bottom + 8)
             }
-            .frame(height: 56)
             .background(
                 ZStack {
-                    Color.black.opacity(0.98)
-                        .background(.ultraThinMaterial)
-                    
-                    GeometryReader { geometry in
-                        RoundedRectangle(cornerRadius: 1.5)
-                            .fill(
-                                LinearGradient(
-                                    gradient: Gradient(colors: [
-                                        Color.cyan,
-                                        Color.pink,
-                                        Color.cyan
-                                    ]),
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(width: geometry.size.width / 2 - 12, height: 2)
-                            .shadow(color: Color.cyan.opacity(0.6), radius: 3)
-                            .offset(
-                                x: selectedTab == 0 ? 6 : geometry.size.width / 2 + 6,
-                                y: 0
-                            )
-                            .animation(.spring(response: 0.25), value: selectedTab)
-                    }
+                    // 深色背景
+                    Color.black.opacity(0.8)
+                    // 毛玻璃效果
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                        .opacity(0.5)
                 }
             )
         }
-        .background(Color.black)
-        .ignoresSafeArea(edges: .bottom)
+        .frame(height: 70)
     }
 }
 
-// MARK: - Tab按钮
-struct TabButton: View {
+// MARK: - Tab 项目
+struct GlassTabItem: View {
     let icon: String
     let title: String
     let isSelected: Bool
+    let namespace: Namespace.ID
     let action: () -> Void
-    
-    @State private var pulseScale: CGFloat = 1.0
-    
+
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 3) {
+            VStack(spacing: 6) {
                 ZStack {
+                    // 选中背景光晕
                     if isSelected {
                         Circle()
-                            .stroke(Color.cyan.opacity(0.25), lineWidth: 1.5)
-                            .frame(width: 36, height: 36)
-                            .scaleEffect(pulseScale)
-                            .opacity(2 - pulseScale)
+                            .fill(
+                                RadialGradient(
+                                    colors: [.cyan.opacity(0.3), .clear],
+                                    center: .center,
+                                    startRadius: 0,
+                                    endRadius: 25
+                                )
+                            )
+                            .frame(width: 50, height: 50)
+                            .matchedGeometryEffect(id: "glow", in: namespace)
                     }
-                    
+
                     Image(systemName: icon)
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(isSelected ? Color.cyan : Color(white: 0.45))
-                        .shadow(
-                            color: isSelected ? Color.cyan.opacity(0.6) : .clear,
-                            radius: isSelected ? 8 : 0
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundStyle(
+                            isSelected
+                                ? LinearGradient(colors: [.cyan, .blue], startPoint: .top, endPoint: .bottom)
+                                : LinearGradient(colors: [.gray, .gray], startPoint: .top, endPoint: .bottom)
                         )
+                        .shadow(color: isSelected ? .cyan.opacity(0.8) : .clear, radius: 8)
+                        .scaleEffect(isSelected ? 1.1 : 1.0)
                 }
-                
+
                 Text(title)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(isSelected ? Color.cyan : Color(white: 0.45))
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                    .foregroundColor(isSelected ? .cyan : .gray)
             }
             .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(PlainButtonStyle())
-        .onAppear {
-            if isSelected {
-                withAnimation(
-                    Animation.easeOut(duration: 1.8)
-                        .repeatForever(autoreverses: false)
-                ) {
-                    pulseScale = 1.4
-                }
-            }
-        }
-        .onChange(of: isSelected) { oldValue, newValue in
-            if newValue {
-                pulseScale = 1.0
-                withAnimation(
-                    Animation.easeOut(duration: 1.8)
-                        .repeatForever(autoreverses: false)
-                ) {
-                    pulseScale = 1.4
-                }
-            } else {
-                pulseScale = 1.0
-            }
-        }
+        .buttonStyle(.plain)
     }
 }
 

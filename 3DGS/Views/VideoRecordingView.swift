@@ -3,7 +3,6 @@
 //  3DGS Scanner
 //
 //  视频录制界面 - 全屏相机录制
-//  TODO: 集成 AVFoundation 实现真实相机功能
 //
 
 import SwiftUI
@@ -11,12 +10,14 @@ import AVFoundation
 
 struct VideoRecordingView: View {
     @Binding var isPresented: Bool
-    let onComplete: (String) -> Void
-    
+    let onComplete: (URL) -> Void
+
+    @StateObject private var cameraService = CameraService()
     @State private var isRecording = false
     @State private var duration = 0
     @State private var showPreview = false
     @State private var timer: Timer?
+    @State private var recordedVideoURL: URL?
     
     var body: some View {
         ZStack {
@@ -113,30 +114,19 @@ struct VideoRecordingView: View {
                 
                 // Camera Preview Area
                 ZStack {
-                    // Simulated camera view
-                    Rectangle()
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color(red: 0.17, green: 0.17, blue: 0.18),
-                                    Color(red: 0.11, green: 0.11, blue: 0.12)
-                                ]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                    
+                    // Real camera preview
+                    CameraPreviewView(session: cameraService.session)
+                        .ignoresSafeArea()
+
                     // Camera grid overlay (rule of thirds)
                     GeometryReader { geometry in
                         Path { path in
-                            // Vertical lines
                             let vSpacing = geometry.size.width / 3
                             path.move(to: CGPoint(x: vSpacing, y: 0))
                             path.addLine(to: CGPoint(x: vSpacing, y: geometry.size.height))
                             path.move(to: CGPoint(x: vSpacing * 2, y: 0))
                             path.addLine(to: CGPoint(x: vSpacing * 2, y: geometry.size.height))
-                            
-                            // Horizontal lines
+
                             let hSpacing = geometry.size.height / 3
                             path.move(to: CGPoint(x: 0, y: hSpacing))
                             path.addLine(to: CGPoint(x: geometry.size.width, y: hSpacing))
@@ -146,11 +136,6 @@ struct VideoRecordingView: View {
                         .stroke(Color.blue.opacity(0.2), lineWidth: 1)
                     }
                     .opacity(0.3)
-                    
-                    // TODO: 集成 AVCaptureSession 显示真实相机画面
-                    Text(showPreview ? "视频预览" : "相机预览")
-                        .font(.system(size: 17))
-                        .foregroundColor(Color(white: 0.6))
                     
                     // Recording indicator
                     if isRecording {
@@ -312,15 +297,28 @@ struct VideoRecordingView: View {
                 .padding(.vertical, 32)
             }
         }
+        .onAppear {
+            cameraService.delegate = VideoRecordingDelegate(
+                onRecordingFinished: { url in
+                    recordedVideoURL = url
+                    showPreview = true
+                    cameraService.stopSession()
+                }
+            )
+            cameraService.configureSession()
+            cameraService.startSession()
+        }
+        .onDisappear {
+            cameraService.stopSession()
+        }
     }
     
     // MARK: - Actions
     private func startRecording() {
         isRecording = true
         duration = 0
-        
-        // TODO: 启动 AVCaptureSession 录制
-        
+        cameraService.startRecording()
+
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             duration += 1
             if duration >= 30 {
@@ -328,24 +326,24 @@ struct VideoRecordingView: View {
             }
         }
     }
-    
+
     private func stopRecording() {
         isRecording = false
         timer?.invalidate()
         timer = nil
-        showPreview = true
-        
-        // TODO: 停止 AVCaptureSession 录制
+        cameraService.stopRecording()
     }
-    
+
     private func retake() {
         duration = 0
         showPreview = false
+        recordedVideoURL = nil
+        cameraService.startSession()
     }
-    
+
     private func confirm() {
-        let fileName = "video_\(Date().timeIntervalSince1970).mp4"
-        onComplete(fileName)
+        guard let videoURL = recordedVideoURL else { return }
+        onComplete(videoURL)
         isPresented = false
     }
     
@@ -397,4 +395,25 @@ struct CameraCorner: View {
         isPresented: .constant(true),
         onComplete: { _ in }
     )
+}
+
+// MARK: - Video Recording Delegate
+class VideoRecordingDelegate: CameraServiceDelegate {
+    let onRecordingFinished: (URL) -> Void
+
+    init(onRecordingFinished: @escaping (URL) -> Void) {
+        self.onRecordingFinished = onRecordingFinished
+    }
+
+    func cameraService(_ service: CameraService, didFinishRecordingTo url: URL) {
+        DispatchQueue.main.async {
+            self.onRecordingFinished(url)
+        }
+    }
+
+    func cameraService(_ service: CameraService, didCapturePhoto image: UIImage, url: URL) {}
+
+    func cameraService(_ service: CameraService, didFailWithError error: Error) {
+        print("录制失败: \(error)")
+    }
 }

@@ -3,18 +3,19 @@
 //  3DGS Scanner
 //
 //  连续拍摄界面 - 拍摄多张照片
-//  TODO: 集成 AVFoundation 实现真实相机功能
 //
 
 import SwiftUI
+import UIKit
 
 struct PhotoCaptureView: View {
     @Binding var isPresented: Bool
-    let onComplete: (String) -> Void
-    
+    let onComplete: ([URL]) -> Void
+
+    @StateObject private var cameraService = CameraService()
     @State private var photos: [CapturedPhoto] = []
     @State private var showPreview = false
-    
+
     private let maxPhotos = 20
     private let minPhotos = 10
     
@@ -111,23 +112,9 @@ struct PhotoCaptureView: View {
                 if !showPreview {
                     // Camera preview
                     ZStack {
-                        Rectangle()
-                            .fill(
-                                LinearGradient(
-                                    gradient: Gradient(colors: [
-                                        Color(red: 0.17, green: 0.17, blue: 0.18),
-                                        Color(red: 0.11, green: 0.11, blue: 0.12)
-                                    ]),
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                        
-                        // TODO: 集成 AVCaptureSession 显示真实相机画面
-                        Text("相机预览")
-                            .font(.system(size: 17))
-                            .foregroundColor(Color(white: 0.6))
-                        
+                        CameraPreviewView(session: cameraService.session)
+                            .ignoresSafeArea()
+
                         // Corner frames
                         VStack {
                             HStack {
@@ -304,8 +291,21 @@ struct PhotoCaptureView: View {
                 }
             }
         }
+        .onAppear {
+            cameraService.delegate = PhotoCaptureDelegate(
+                onPhotoCaptured: { image, url in
+                    let photo = CapturedPhoto(id: UUID().uuidString, url: url, image: image)
+                    photos.append(photo)
+                }
+            )
+            cameraService.configureSession()
+            cameraService.startSession()
+        }
+        .onDisappear {
+            cameraService.stopSession()
+        }
     }
-    
+
     // MARK: - Computed Properties
     private var hintText: String {
         if photos.count < minPhotos {
@@ -320,24 +320,23 @@ struct PhotoCaptureView: View {
     // MARK: - Actions
     private func capturePhoto() {
         guard photos.count < maxPhotos else { return }
-        
-        // TODO: 使用 AVCapturePhotoOutput 拍摄照片
-        let photo = CapturedPhoto(id: UUID().uuidString)
-        photos.append(photo)
+        cameraService.capturePhoto()
     }
-    
+
     private func removePhoto(at index: Int) {
+        let photo = photos[index]
+        try? FileManager.default.removeItem(at: photo.url)
         photos.remove(at: index)
     }
-    
+
     private func complete() {
         guard photos.count >= minPhotos else { return }
         showPreview = true
     }
-    
+
     private func confirm() {
-        let fileName = "photos_\(Date().timeIntervalSince1970).zip"
-        onComplete(fileName)
+        let urls = photos.map { $0.url }
+        onComplete(urls)
         isPresented = false
     }
 }
@@ -345,6 +344,8 @@ struct PhotoCaptureView: View {
 // MARK: - Models
 struct CapturedPhoto: Identifiable {
     let id: String
+    let url: URL
+    let image: UIImage
 }
 
 #Preview {
@@ -352,4 +353,25 @@ struct CapturedPhoto: Identifiable {
         isPresented: .constant(true),
         onComplete: { _ in }
     )
+}
+
+// MARK: - Photo Capture Delegate
+class PhotoCaptureDelegate: CameraServiceDelegate {
+    let onPhotoCaptured: (UIImage, URL) -> Void
+
+    init(onPhotoCaptured: @escaping (UIImage, URL) -> Void) {
+        self.onPhotoCaptured = onPhotoCaptured
+    }
+
+    func cameraService(_ service: CameraService, didFinishRecordingTo url: URL) {}
+
+    func cameraService(_ service: CameraService, didCapturePhoto image: UIImage, url: URL) {
+        DispatchQueue.main.async {
+            self.onPhotoCaptured(image, url)
+        }
+    }
+
+    func cameraService(_ service: CameraService, didFailWithError error: Error) {
+        print("拍照失败: \(error)")
+    }
 }
